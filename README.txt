@@ -27,7 +27,7 @@ Install Qt5
 
 
 Download and install SequenceTree4
-  0. $git clone https://github.com/NonVersed/sequencetree4.git
+  0. $git clone https://github.com/btdvu/sequencetree.git
   1. $cd sequencetree4/src
   2. $qmake
   3. $make
@@ -37,6 +37,7 @@ Download and install SequenceTree4
 Run SequenceTree 4
   0. $cd sequencetree4/bin
   1. $./st4
+
 
 
 
