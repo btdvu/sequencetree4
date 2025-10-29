@@ -26,8 +26,8 @@ Install Qt5
   0. $sudo apt-get install qtcreator qtbase5-dev qt5-qmake cmake
 
 
-Download and install SequenceTree4
-  0. $git clone https://github.com/btdvu/sequencetree.git
+Download and install SequenceTree 4
+  0. $git clone https://github.com/btdvu/sequencetree4.git
   1. $cd sequencetree4/src
   2. $qmake
   3. $make
@@ -37,6 +37,7 @@ Download and install SequenceTree4
 Run SequenceTree 4
   0. $cd sequencetree4/bin
   1. $./st4
+
 
 
 
