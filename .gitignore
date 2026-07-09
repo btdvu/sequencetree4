@@ -1,0 +1,27 @@
+# ==========================================
+# SequenceTree 4 Git Ignore Rules
+# ==========================================
+
+# Ignore build outputs and temporary execution spaces
+tmp/
+bin/st4
+bin/st4.app/
+
+# Ignore Qt meta-object compiler (MOC) and layout generation code
+src/moc_*.cpp
+src/ui_*.h
+src/qrc_*.cpp
+src/.qmake.stash
+
+# Ignore compiler object files and standard build targets
+*.o
+*.a
+*.so
+*.dylib
+src/Makefile
+
+# Ignore OS-specific workspace clutter
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
