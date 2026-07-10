@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SequenceTree 4
+Comment=Launch Sequence Tree 4 inside Docker
+# Edit exec and icon commands based on the location of your ST4 directory
+Exec=bash -c "cd /home/brian/sequencetree4 && ./dev.sh bash -c 'cd bin && ./st4'"
+Icon=/home/brian/sequencetree4/src/gui/images/STgui.ico
+Terminal=true
+Categories=Development;

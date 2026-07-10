@@ -24,7 +24,8 @@ fi
 docker run -it --rm \
     --name sequencetree_workspace \
     -v "$(pwd)":/st_workspace \
+    -w /st_workspace \
     $X11_MOUNT \
     -e DISPLAY=$DISPLAY_ENV \
     --user "$(id -u):$(id -g)" \
-    sequencetree_env:base
+    sequencetree_env:base "$@"
