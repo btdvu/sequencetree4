@@ -228,42 +228,105 @@ To exit the container at any time, close the graphical window and type `exit` in
 
 ---
 
-## Example: Defining a Custom Sequence in C++
+## Example: SPGR Sequence Tree Hierarchy
 
-Below is a conceptual example showing how a standard sequence structure is subclassed and populated using framework macros:
+SequenceTree designs sequences by nesting loop, block, and event nodes in a hierarchical tree. Below is the tree structure of the standard Spoiled Gradient Echo (SPGR) sequence configured in [sequences/spgr.sts](sequences/spgr.sts). For simplicity, this diagram illustrates the main imaging loop (`MainLoop`) layout (omitting the identical steady-state preparation loop branch, `PrepLoop`). The loop executes an `STGradientEchoBlock` composed of excitation, readout acquisition, and gradient spoiling/rewinding nodes.
 
-```cpp
-#include "st4.h"
-
-class MyGradientEchoSequence : public STSequence {
-public:
-    STReal TR;
-    STReal TE;
+### Visual Tree Hierarchy & Node Parameters
+```mermaid
+graph TD
+    %% Root Node
+    Root["<b>Root (STSequence)</b><br/>• FOV = (256, 256, 50) mm<br/>• maxamp = 20 uT/mm<br/>• ramprate = 0.1 uT/mm/us"]
     
-    // The setup function constructs the node tree structure
-    void setup() override {
-        // 1. Define configuration parameters
-        ST_PARAMETER(STReal, TR, 50000, microsec) // 50 ms TR
-        ST_PARAMETER(STReal, TE, 6000, microsec)  // 6 ms TE
-        
-        // 2. Add children nodes (hierarchical loop & block structure)
-        ST_CHILD(STCartesianLoop, Loop)
-        // Loop contains STGradientEchoBlock internally
-    }
-};
+    %% First level
+    MainLoop["<b>MainLoop (SPGRLoop)</b><br/>• PE1 = -128:1:127 (ky)<br/>• PE2 = 0:1:0 (kz)"]
+    Root --> MainLoop
+    
+    %% Second level (Blocks)
+    MainBlock["<b>Block (STGradientEchoBlock)</b><br/>• TE = 6000 us<br/>• TR = 50000 us"]
+    MainLoop --> MainBlock
+    
+    %% Third level (MainBlock components)
+    MainExcite["<b>Excite (STExcite)</b><br/>• thickness = 10 mm"]
+    MainAcquire["<b>Acquire (STAcquire)</b><br/>• echo_moment = ky-dependent"]
+    MainRewind["<b>Rewind (STEncode)</b><br/>• moment = (0,0,100k)"]
+    MainBlock --> MainExcite
+    MainBlock --> MainAcquire
+    MainBlock --> MainRewind
+    
+    %% Fourth level (Excitation subnodes)
+    MainPrephase["<b>Prephase (STGradientMom)</b><br/>• alignment = Left"]
+    MainSliceGrad["<b>SliceGradient (STGradientAmp)</b><br/>• amplitude = (0,0,10) uT/mm"]
+    MainRF["<b>RF (STSincRF)</b><br/>• flip_angle = 45°"]
+    MainExcite --> MainPrephase
+    MainExcite --> MainSliceGrad
+    MainExcite --> MainRF
+    
+    %% Fourth level (Acquisition subnodes)
+    MainEncode["<b>Encode (STGradientMom)</b><br/>• alignment = Left"]
+    MainReadGrad["<b>ReadoutGradient (STGradientAmp)</b><br/>• plateau = 7680 us"]
+    MainReadout["<b>Readout (STReadout)</b><br/>• N = 256, dwell = 30 us"]
+    MainAcquire --> MainEncode
+    MainAcquire --> MainReadGrad
+    MainAcquire --> MainReadout
+    
+    %% Fourth level (Rewinder subnodes)
+    MainRewindGrad["<b>Gradient (STGradientMom)</b><br/>• moment = (0,0,100k)"]
+    MainRewind --> MainRewindGrad
 ```
+
+### Detailed Node-by-Node Parameters List
+
+Below is a summary of the configuration parameters set at each node level of the SPGR sequence tree:
+
+1. **Root (`STSequence`)**
+   - `FOV`: `(256, 256, 50)` mm — Global field of view.
+   - `maxamp`: `20` uT/mm — Maximum physical gradient amplitude.
+   - `ramprate`: `0.1` [uT/mm]/µs — Slew rate constraint.
+   - `gamma`: `42.5764` Hz/uT — Gyromagnetic ratio for $^1\text{H}$.
+
+2. **PrepLoop / MainLoop (`SPGRLoop`)**
+   - `PE1`: Iteration range for phase-encoding axis 1 (e.g., `-128:1:127` in the imaging loop, `1:1:10` in prep loop).
+   - `PE2`: Iteration range for 3D phase-encoding partition (e.g., `0:1:0`).
+   - `readout_dir`: `(1, 0, 0)` — Unit vector direction of readout axis.
+   - `PE1_dir` / `PE2_dir`: `(0, 1, 0)` / `(0, 0, 1)` — Unit vector directions for phase encoding.
+   - `RF_spoiling`: `1` (enabled) — Instructs loop run iteration to calculate pseudo-randomized phases for RF and ADC.
+
+3. **Block (`STGradientEchoBlock`)**
+   - `TE`: `6000` µs — Time to echo.
+   - `TR`: `50000` µs — Repetition time.
+   - `excite_time`: `1000` µs — Absolute timing offset of excitation inside the TR block.
+
+4. **Excite (`STExcite`)**
+   - `gradient_amplitude`: `(0, 0, 10)` uT/mm — Slice-select plateau gradient.
+   - `slice_thickness`: `10` mm — Prescribed slice thickness.
+   - `prephase`: `1` (enabled) — Automatically calculate and play refocusing/prephasing lobe.
+
+5. **RF (`STSincRF`)**
+   - `num_lobes_left` / `num_lobes_right`: `2` — Number of side lobes on each side of the sinc function peak.
+   - `flip_angle`: `45` degrees — Target excitation flip angle.
+   - `pulse_duration`: `1409.23` µs — Automatically sized to match bandwidth constraints.
+   - `time_step`: `10` µs — Time discretization for digital pulse rendering.
+
+6. **Acquire (`STAcquire`)**
+   - `echo_moment`: `(0, -8073.72, 0)` [uT/mm]-µs — Desired moment at the center of the echo (driven by loop iteration and phase-encoding index).
+   - `moment_per_point`: `(91.7468, 0, 0)` [uT/mm]-µs — Trajectory step per readout sample.
+
+7. **Rewind (`STEncode`)**
+   - `moment`: `(0, 0, 100000)` [uT/mm]-µs — Target moment on the slice/z axis to spoil/dephase residual transverse magnetization.
+   - `do_rewind`: `1` (enabled) — Turns on the gradient rewinding node.
 
 ---
 
 ## Documentation
 
 For a deep dive into using the IDE or extending classes, refer to the documents in the `doc/` directory:
-- [st4-users-manual.pdf](file:///sequencetree4/doc/st4-users-manual.pdf) — Comprehensive guide on IDE menus, custom sequence design, plotting controls, and parameter mappings.
-- [CODE_STRUCTURE.md (Framework Core)](file:///sequencetree4/code/framework/CODE_STRUCTURE.md) — Reference documentation detailing internal variables and classes.
-- [CODE_STRUCTURE.md (Foundation Nodes)](file:///sequencetree4/code/nodetypes/foundation/CODE_STRUCTURE.md) — Detailed class guide for standard RF pulses, readout ADCs, crushers, loops, and gradient shapes.
+- [doc/st4-users-manual.pdf](doc/st4-users-manual.pdf) — Comprehensive guide on IDE menus, custom sequence design, plotting controls, and parameter mappings.
+- [code/framework/CODE_STRUCTURE.md](code/framework/CODE_STRUCTURE.md) — Reference documentation detailing internal variables and classes.
+- [code/nodetypes/foundation/CODE_STRUCTURE.md](code/nodetypes/foundation/CODE_STRUCTURE.md) — Detailed class guide for standard RF pulses, readout ADCs, crushers, loops, and gradient shapes.
 
 ---
 
 ## License
 
-This project is licensed under the terms of the GNU General Public License v2 (GPL-2.0). See [License.txt](file:///sequencetree4/License.txt) for the full license text.
+This project is licensed under the terms of the GNU General Public License v2 (GPL-2.0). See [License.txt](License.txt) for the full license text.
